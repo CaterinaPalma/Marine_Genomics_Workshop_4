@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=60
-#SBATCH --ntasks=6 --mem=10gb
+#SBATCH --ntasks=6 --mem=60gb
 
 echo "Starting checkm in $(pwd) at $(date)"
 

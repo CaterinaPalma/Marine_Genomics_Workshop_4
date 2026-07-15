@@ -217,7 +217,7 @@ mkdir genomes
 We’ll build up the command in steps. First just get the while loop working
 
 ```bash 
-while read bin;do echo $bin;done < ../checkm/bbd_topbins.txt
+while read bin;do echo $bin;done < ../gtdbtk/genomes/bbd_topbins.txt
 ``` 
 
 ```bash
@@ -281,15 +281,150 @@ Find out the first bin ID in your list
 head -n 1 ../checkm/bbd_topbins.txt
 ``` 
 
+Output: contig_120 
 
 
+```bash 
+bin=contig_120
+prokka --outdir $bin --prefix $bin  ../metabat/bins_bbd/${bin}.fa
+``` 
+
+#### Step 4. Create a new blank text file 
+Save it in your prokka directory. Call it run_prokka.sh and copy the following code into it.
+
+#!/bin/bash
+#SBATCH --time=60
+#SBATCH --ntasks=2 --mem=40gb
+
+echo "Starting prokka in $(pwd) at $(date)"
+
+shopt -s expand_aliases
+alias prokka='apptainer run -B /pvol/:/pvol /pvol/data/sif/prokka.sif prokka'
+
+while read bin;do 
+  prokka --outdir $bin --prefix $bin "../metabat/bins_bbd/${bin}.fa";
+done < ../checkm/bbd_topbins.txt
+
+echo "Finished prokka in $(pwd) at $(date)"
+
+submit job: 
+
+```bash
+sbatch run_prokka.sh
+```
+
+Output: slurm-599 
+
+# Infer Metabolic Pathways 
+
+#### Step 1. Create new directory 
+
+First make sure we''re in main directory... 
+
+```bash
+cd .. 
+mkdir minpath
+cd minpath
+``` 
+
+#### Step 2. Start by looking at the .tsv file for a single bin: 
+
+```bash
+head ../prokka/contig_120/contig_120.tsv
+``` 
+
+#### Step 3. For input to minpath 
+We only want to keep a unique ID for each gene (column 1) and its EC number (column 5). We can transform the tsv into this format using awk like this. 
+
+```bash
+head ../prokka/contig_120/contig_120.tsv | awk -F '\t' '{print $1,$5}'
+``` 
+
+#### Step 4. Filter the output to only include lines with an EC number
+
+```bash
+head ../prokka/contig_120/contig_120.tsv | awk -F '\t' '$5{print $1,$5}'
+``` 
+
+#### Step 5. Ensure that the output is tab separated 
+and we also need to remove the header line. 
+
+```bash
+head ../prokka/contig_120/contig_120.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus'
+```
+
+#### Step 6. This only processes the first 10 lines 
+… we need to change head to cat to include all genes 
+
+```bash 
+cat ../prokka/contig_120/contig_120.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus'
+``` 
+
+#### Step 7. Send the output to a file 
+so that it can be used as input to minpath
+
+```bash 
+cat ../prokka/contig_120/contig_120.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus' > contig_120.ec
+``` 
+
+#### Step 8. Run minpath on this file as follows: 
+
+```bash
+minpath -ec contig_120.ec -report contig_120.ec.report -details contig_120.ec.details
+``` 
+
+### Step 9. Take a look at the top few lines of output
+
+```bash
+head contig_120.ec.report 
+```
+
+My First Line: 
+path PWY-7321 any n/a  naive 1  minpath 0  fam0  4  fam-found  1  name  ecdysteroid metabolism (arthropods)
+
+#### Step 10. 
+
+```bash
+while read bin;do 
+  cat ../prokka/$bin/${bin}.tsv | awk -F '\t' '$5{printf("%s\t%s\n", $1,$5)}' | grep -v '^locus' > ${bin}.ec 
+done < ../checkm/bbd_topbins.txt
+``` 
+
+#### Step 11. 
+
+```bash
+while read bin;do 
+  minpath -ec ${bin}.ec -report ${bin}.ec.report -details ${bin}.ec.details
+done < ../checkm/bbd_topbins.txt
+```
+
+#### Step 12. Photosynthesis light reactions: 
+
+There is a huge amount of information in the outputs from minpath. To keep things tractable we are just going to look at two pathways.
+
+The first pathway is named photosynthesis light reactions and has the metacyc code PWY-101. This pathway includes the essential components of photosynthesis that occur in light, Photosystem I and Photosystem II.
+
+Use the following command to search for this pathway across all the bins
+
+```bash
+grep 'PWY-5360' *.ec.report
+```
+
+###### Question 
+How many bins contain at least one gene from this pathway? 4 bins 
+Which bin has all of the genes (ie. a complete pathway)? metabat.32 
 
 
+#### Step 12. Cross Reference Results 
+Cross reference your results with the output from gtdbtk to see the taxonomy of bins containing this pathway. Note that you will need to modify the commands below to use the correct bin numbers (these will be different for everyone).
 
+```bash
+grep 'metabat.32' ../gtdbtk/out/gtdbtk.bac120.summary.tsv
+``` 
 
+The second pathway is a little less obviously named. It is called superpathway of tetrathionate reduction and has metacyc code PWY-5360. This pathway is important because it includes enzymes required to reduce sulfite to hydrogen sulfide. Note that sulfite acts as the terminal electron acceptor in this pathway, however, in a broader sense the term “sulfate reducing” refers to micro-organisms that can produce sulfide from a range of oxidised sulfur compounds.
 
-
-
-
-
+###### Question 
+How many bins contain the pathway PWY-5360? one - metabat.33 
+What family (in a taxonomic sense) do these bins belong to? genus Halarcobacter 
 
