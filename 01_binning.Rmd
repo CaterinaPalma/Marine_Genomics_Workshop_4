@@ -24,20 +24,20 @@ cd Marine_Genomics_Workshop_4
 Now I can begin with step 1. 
 
 
-### Step 1: Making a directory called flye 
+#### Step 1: Making a directory called flye 
 
 ```bash 
 mkdir flye
 cd flye
 ```
 
-### Step 2: Make a symbolic link to the bbd read area 
+#### Step 2: Make a symbolic link to the bbd read area 
 
 ```bash 
 ln -s /pvol/data/metagenome_assembly/bbd_0.1.fastq.gz .
 ```
 
-### Step 3: Make shell script and put below into it 
+#### Step 3: Make shell script and put below into it 
 
 #!/bin/bash
 #SBATCH --time=720
@@ -49,7 +49,7 @@ flye --nano-hq ../flye/bbd_0.1.fastq.gz --threads 12 --out-dir bbd --meta
 
 echo "Finished flye bbd in $(pwd) at $(date)"
 
-### Step 4: Submit the job 
+#### Step 4: Submit the job 
 
 ```bash 
 sbatch run_flye_bbd.sh
@@ -64,32 +64,32 @@ tail -f slurm-507.out
 
 # Binning & Checking Bin Quality 
 
-### Step 1. Make New Directory "metabat" and go to the directory 
+#### Step 1. Make New Directory "metabat" and go to the directory 
 
 ```bash
 mkdir metabat
 cd metabat
 ``` 
 
-### Step 2. Extract Depth Information 
+#### Step 2. Extract Depth Information 
 
 ```bash 
 cat ../flye/bbd/assembly_info.txt  | grep -v '#' | awk '{OFS="\t";print $1,$3}' > depths_bbd.txt
 ```
 
-### Step 3. Reorder contigs based on depth
+#### Step 3. Reorder contigs based on depth
 
 ```bash
 cat depths_bbd.txt | awk '{print $1}' | xargs samtools faidx ../flye/bbd/assembly.fasta > assembly_bbd_ordered.fasta
 ```
 
-### Step 4. Run Metabat 
+#### Step 4. Run Metabat 
 
 ```bash
 metabat2 -i assembly_bbd_ordered.fasta -a depths_bbd.txt --cvExt -o bins_bbd/metabat --seed 5
 ``` 
 
-### Step 5. Check bin quality with checkm 
+#### Step 5. Check bin quality with checkm 
 
 Make sure I'm not in any other directory 
 
@@ -105,7 +105,7 @@ mkdir checkm
 cd checkm
 ``` 
 
-### Step 6. You will need to find the number of your largest contig in the bbd assembly 
+#### Step 6. You will need to find the number of your largest contig in the bbd assembly 
 
 ```bash 
 cat ../flye/bbd/assembly.fasta | bioawk -c fastx '{print length($seq),$name}' | sort -n
@@ -119,13 +119,12 @@ cp ../metabat/bins_bbd/*.fa bins_bbd/
 samtools faidx ../flye/bbd/assembly.fasta contig_120 > bins_bbd/contig_120.fa
 ``` 
 
-### Step 7. Create a slurm script for checkm run. Your script called: run_checkm_bbd.sh
-
-Put the below in the shell script: 
+#### Step 7. Create a slurm script for checkm run. 
+Script called "run_checkm_bbd.sh". Put the below in the shell script: 
 
 #!/bin/bash
 #SBATCH --time=60
-#SBATCH --ntasks=6 --mem=10gb
+#SBATCH --ntasks=6 --mem=60gb
 
 echo "Starting checkm in $(pwd) at $(date)"
 
@@ -136,19 +135,160 @@ checkm lineage_wf bins_bbd out -t 4 -x fa -f checkm_results_bbd.txt
 
 echo "Finished checkm in $(pwd) at $(date)"
 
-### Step 8. Submit sm job: 
+#### Step 8. Submit sm job: 
 
 ```bash
 sbatch run_checkm_bbd.sh
 ``` 
 
-Output: batch slurm-535 
+Output: batch slurm-559
 
 Check where I am in queue: 
 
 ```bash
 squeue
 ``` 
+
+# Select bins based on checkm results
+
+#### Step 1. Make sure I'm in "checkm" directory 
+
+```bash
+cd checkm
+```
+
+#### Step 2. Results are summarised in file "checkm_results_bbd.txt" 
+
+You can view the results in the terminal using cat, head, more or less commands. These all represent different ways to view a text file.
+
+```bash
+head checkm_results_bbd.txt 
+```
+
+#### Step 3. Take a look at the Marker lineage column for the top few bins.
+Try viewing a few more results by telling the head command to show more lines
+
+```bash
+head -n 20 checkm_results_bbd.txt 
+``` 
+
+#### Step 4. Focusing on bins with a completeness greater than 15% using "awk". 
+
+```bash 
+cat checkm_results_bbd.txt | awk '$13>15'
+``` 
+
+#### Step 5. These are the bins we want but we just want the bin ID not the entire line. 
+To get this we can use the print command: 
+
+```bash 
+cat checkm_results_bbd.txt | awk '$13>15{print $1}'
+``` 
+
+#### Step 6. Sening output to a file so that we can use it in the next step: 
+
+```bash 
+cat checkm_results_bbd.txt | awk '$13>15{print $1}' > bbd_topbins.txt
+``` 
+
+# Perform taxonomic classification with gtdbtk
+
+Go to main directory
+
+```bash
+cd ..
+``` 
+
+#### Step 1. Make new directory called "gtdbtk" 
+
+```bash 
+mkdir gtdbtk
+cd gtdbtk
+```
+
+#### Step 2. Create sub-folder 
+This is where we will put a copy of each of the top bins we identified in step 1.
+
+```bash 
+mkdir genomes
+``` 
+
+#### Step 3. Building a command in steps: 
+We’ll build up the command in steps. First just get the while loop working
+
+```bash 
+while read bin;do echo $bin;done < ../checkm/bbd_topbins.txt
+``` 
+
+```bash
+while read bin;do echo "../metabat/bins_bbd/${bin}.fa";done < ../checkm/bbd_topbins.txt
+``` 
+
+```bash
+while read bin;do cp "../metabat/bins_bbd/${bin}.fa" genomes;done < ../checkm/bbd_topbins.txt
+``` 
+
+#### Step 4. Check that it worked by listing files within the genomes directory. You should see one file for each of the bins: 
+
+```bash 
+ls genomes
+``` 
+
+#### Step 5. Make shell script 
+Make a shell script with the below named: "run_gtdbtk.sh" 
+
+#!/bin/bash
+#SBATCH --time=60
+#SBATCH --ntasks=2 --mem=40gb
+
+echo "Starting gtdbtk in $(pwd) at $(date)"
+
+shopt -s expand_aliases
+alias gtdbtk='apptainer run -B /pvol:/pvol,/pvol/data/mg/gtdbtkdata/release207_v2/:/refdata /pvol/data/sif/gtdbtk.sif'
+
+gtdbtk classify_wf -x fa --cpus 2 --genome_dir genomes --out_dir out --skip_ani_screen
+
+echo "Finished gtdbtk in $(pwd) at $(date)"
+
+#### Step 6. Submit 
+
+```bash 
+sbatch run_gtdbtk.sh
+``` 
+
+Output: slurm-580
+
+```bash
+squeue
+```
+
+HEeeeeeeeeeerrrrerererererererererererereerererererererererererererererererererrereeererererererererererererere
+
+# Find and Anotate Genes with prokka 
+
+#### Step 1. Make new directory 
+
+```bash
+mkdir prokka
+cd prokka
+``` 
+
+#### Step 2. Running prokka for single bin 
+This produces quite a bit of output. Watch the output as it goes by. This output gives a good idea of the various steps prokka goes through.
+
+Find out the first bin ID in your list
+```bash 
+head -n 1 ../checkm/bbd_topbins.txt
+``` 
+
+
+
+
+
+
+
+
+
 
 
 
