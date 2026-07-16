@@ -407,7 +407,7 @@ The first pathway is named photosynthesis light reactions and has the metacyc co
 Use the following command to search for this pathway across all the bins
 
 ```bash
-grep 'PWY-5360' *.ec.report
+grep 'PWY-101' *.ec.report
 ```
 
 ###### Question 
@@ -425,6 +425,11 @@ grep 'metabat.32' ../gtdbtk/out/gtdbtk.bac120.summary.tsv
 The second pathway is a little less obviously named. It is called superpathway of tetrathionate reduction and has metacyc code PWY-5360. This pathway is important because it includes enzymes required to reduce sulfite to hydrogen sulfide. Note that sulfite acts as the terminal electron acceptor in this pathway, however, in a broader sense the term “sulfate reducing” refers to micro-organisms that can produce sulfide from a range of oxidised sulfur compounds.
 
 ###### Question 
+
+```bash
+grep 'PWY-5360' *.ec.report
+```
+
 How many bins contain the pathway PWY-5360? one - metabat.33 
 What family (in a taxonomic sense) do these bins belong to? genus Halarcobacter 
 
