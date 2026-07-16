@@ -433,3 +433,9 @@ grep 'PWY-5360' *.ec.report
 How many bins contain the pathway PWY-5360? one - metabat.33 
 What family (in a taxonomic sense) do these bins belong to? genus Halarcobacter 
 
+```{r}
+#library(tidyverse)
+gtdbtkresults <- read_tsv("gtdbtk/out/gtdbtk.bac120.summary.tsv")
+```
+
+
